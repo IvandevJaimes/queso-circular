@@ -1,14 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Produccion } from './produccion.entity';
+import { ChatProduccionDto } from './dto/chat-produccion.dto';
 import { CrearProduccionDto } from './dto/crear-produccion.dto';
+import { RecomendarProduccionDto } from './dto/recomendar-produccion.dto';
+import {
+  ChatIAResponse,
+  IaService,
+  RecomendacionIAResponse,
+} from './ia.service';
+import { Produccion } from './produccion.entity';
 
 @Injectable()
 export class ProduccionesService {
   constructor(
     @InjectRepository(Produccion)
     private produccionesRepository: Repository<Produccion>,
+    private readonly iaService: IaService,
   ) {}
 
   async crear(datos: CrearProduccionDto) {
@@ -37,5 +45,15 @@ export class ProduccionesService {
 
   async eliminar(id: number) {
     return this.produccionesRepository.delete(id);
+  }
+
+  async generarRecomendacionIA(
+    dto: RecomendarProduccionDto,
+  ): Promise<RecomendacionIAResponse> {
+    return this.iaService.generarRecomendacion(dto);
+  }
+
+  async responderChatIA(dto: ChatProduccionDto): Promise<ChatIAResponse> {
+    return this.iaService.responderChat(dto);
   }
 }

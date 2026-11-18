@@ -1,16 +1,18 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Param,
+  Controller,
   Delete,
-  ParseIntPipe,
+  Get,
   NotFoundException,
+  Param,
+  ParseIntPipe,
+  Post,
 } from '@nestjs/common';
 
-import { ProduccionesService } from './producciones.service';
+import { ChatProduccionDto } from './dto/chat-produccion.dto';
 import { CrearProduccionDto } from './dto/crear-produccion.dto';
+import { RecomendarProduccionDto } from './dto/recomendar-produccion.dto';
+import { ProduccionesService } from './producciones.service';
 
 @Controller('producciones')
 export class ProduccionesController {
@@ -19,6 +21,16 @@ export class ProduccionesController {
   @Post()
   crear(@Body() datos: CrearProduccionDto) {
     return this.produccionesService.crear(datos);
+  }
+
+  @Post('recomendar')
+  recomendar(@Body() dto: RecomendarProduccionDto) {
+    return this.produccionesService.generarRecomendacionIA(dto);
+  }
+
+  @Post('chat')
+  chat(@Body() dto: ChatProduccionDto) {
+    return this.produccionesService.responderChatIA(dto);
   }
 
   @Get()

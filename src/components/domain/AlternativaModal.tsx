@@ -1,4 +1,4 @@
-import { CheckCircle2, ShieldAlert, Wrench } from 'lucide-react';
+import { CheckCircle2, ShieldAlert, Sparkles, Wrench } from 'lucide-react';
 import type { Alternativa } from '../../types/produccion.types';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -7,12 +7,16 @@ import { getAlternativaIcon } from './AlternativaCard';
 
 interface AlternativaModalProps {
   alternativa: Alternativa | null;
+  isGeneratingIA?: boolean;
   onClose: () => void;
+  onConsultIA?: (alternativa: Alternativa) => void;
 }
 
 export function AlternativaModal({
   alternativa,
+  isGeneratingIA = false,
   onClose,
+  onConsultIA,
 }: AlternativaModalProps) {
   if (!alternativa) return null;
 
@@ -25,9 +29,27 @@ export function AlternativaModal({
       title={alternativa.titulo}
       subtitle={`Escala recomendada: ${alternativa.escalaIdeal}`}
       footer={
-        <Button variant="secondary" size="sm" onClick={onClose}>
-          Cerrar ficha
-        </Button>
+        <div className="flex w-full items-center justify-between gap-2">
+          {onConsultIA ? (
+            <Button
+              variant="primary"
+              size="sm"
+              isLoading={isGeneratingIA}
+              disabled={isGeneratingIA}
+              leftIcon={<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
+              onClick={() => onConsultIA(alternativa)}
+            >
+              {isGeneratingIA
+                ? 'Analizando...'
+                : 'Consultar viabilidad con IA'}
+            </Button>
+          ) : (
+            <span />
+          )}
+          <Button variant="secondary" size="sm" onClick={onClose}>
+            Cerrar ficha
+          </Button>
+        </div>
       }
     >
       <div className="flex flex-col gap-5">
