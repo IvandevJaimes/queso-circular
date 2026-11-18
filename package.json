@@ -1,22 +1,36 @@
 {
   "name": "queso-circular-ia",
   "version": "1.0.0",
-  "main": "index.ts",
+  "type": "module",
+  "private": true,
   "dependencies": {
-    "expo": "~58.0.23",
-    "expo-status-bar": "~58.0.4",
+    "@hookform/resolvers": "^7.0.7",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.74.0",
     "react": "19.3.0",
-    "react-native": "0.88.1"
+    "react-dom": "19.3.0",
+    "react-hook-form": "^7.92.0",
+    "react-router-dom": "^7.18.5",
+    "tailwind-merge": "^3.7.0",
+    "zod": "^4.6.7",
+    "zustand": "^5.1.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
     "@types/react": "~19.3.0",
-    "typescript": "~6.0.3"
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "concurrently": "^10.0.7",
+    "tailwindcss": "^4.3.5",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.8"
   },
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
-  },
-  "private": true
+    "dev": "concurrently -n \"backend,frontend\" -c \"blue,green\" \"npm --prefix backend run start:dev -- --preserveWatchOutput\" \"vite --open\"",
+    "dev:backend": "npm --prefix backend run start:dev",
+    "dev:front": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  }
 }
