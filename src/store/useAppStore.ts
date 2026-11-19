@@ -38,7 +38,12 @@ function getInitialTheme(): ThemeMode {
 
 function applyThemeToDom(theme: ThemeMode): void {
   if (typeof document === 'undefined') return;
-  document.documentElement.classList.toggle('dark', theme === 'dark');
+  const isDark = theme === 'dark';
+  document.documentElement.classList.toggle('dark', isDark);
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeMeta) {
+    themeMeta.setAttribute('content', isDark ? '#09090b' : '#fafaf9');
+  }
   try {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);
   } catch {
@@ -77,8 +82,9 @@ interface AppState {
   setLitrosInput: (raw: string) => void;
   setUltimaEstimacion: (estimacion: EstimacionResultado | null) => void;
   enviarConsultaChat: (
-    litrosLeche: number,
+    litrosLeche?: number,
     preguntaUsuario?: string,
+    alternativaObjetivo?: AlternativaId,
   ) => Promise<void>;
   limpiarChat: () => void;
   toggleChatExpanded: () => void;
@@ -156,11 +162,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ ultimaEstimacion: estimacion });
   },
 
-  enviarConsultaChat: async (litrosLeche, preguntaUsuario) => {
+  enviarConsultaChat: async (
+    litrosLeche,
+    preguntaUsuario,
+    alternativaObjetivo,
+  ) => {
     const pregunta = preguntaUsuario?.trim();
-    if (litrosLeche <= 0) return;
+    const tieneLitros = typeof litrosLeche === 'number' && litrosLeche > 0;
+    if (!tieneLitros && !pregunta) return;
     if (get().isGeneratingIA) return;
-    if (!pregunta && get().chatConsultadoLitros === litrosLeche) return;
+    if (!pregunta && tieneLitros && get().chatConsultadoLitros === litrosLeche) {
+      return;
+    }
 
     const requestToken = ++activeChatRequestToken;
     const mensajesPrevios = get().chatMessages;
@@ -195,9 +208,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const tipoInteraccion: 'inicial' | 'cambio_litros' | 'pregunta' = pregunta
       ? 'pregunta'
-      : litrosPrevios && litrosPrevios !== litrosLeche
+      : litrosPrevios && tieneLitros && litrosPrevios !== litrosLeche
         ? 'cambio_litros'
         : 'inicial';
+
+    const nuevoLitrosConsultado = tieneLitros
+      ? litrosLeche
+      : get().chatConsultadoLitros;
 
     if (pregunta) {
       set((state) => {
@@ -208,13 +225,13 @@ export const useAppStore = create<AppState>((set, get) => ({
           id: crearIdMensaje(),
           role: 'user',
           texto: pregunta,
-          litrosContexto: litrosLeche,
+          ...(tieneLitros ? { litrosContexto: litrosLeche } : {}),
         };
         return {
           chatMessages: yaRegistrada
             ? state.chatMessages
             : [...state.chatMessages, userMsg],
-          chatConsultadoLitros: litrosLeche,
+          chatConsultadoLitros: nuevoLitrosConsultado,
           isChatLoading: true,
           isGeneratingIA: true,
         };
@@ -223,7 +240,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({
         isChatLoading: true,
         isGeneratingIA: true,
-        chatConsultadoLitros: litrosLeche,
+        chatConsultadoLitros: nuevoLitrosConsultado,
       });
     }
 
@@ -234,15 +251,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const [respuesta] = await Promise.all([
         produccionesService.enviarMensajeChat(
-          litrosLeche,
+          tieneLitros ? litrosLeche : undefined,
           pregunta,
           historialPrevio,
           {
             litrosAnteriores:
-              litrosPrevios && litrosPrevios !== litrosLeche
+              tieneLitros && litrosPrevios && litrosPrevios !== litrosLeche
                 ? litrosPrevios
                 : undefined,
             tipoInteraccion,
+            alternativaObjetivo,
             recetasPrevias,
             alternativasPrevias,
           },
@@ -257,12 +275,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         role: 'assistant',
         texto: respuesta.mensaje,
         data: respuesta,
-        litrosContexto: litrosLeche,
+        ...(tieneLitros ? { litrosContexto: litrosLeche } : {}),
       };
 
       set((state) => ({
         chatMessages: [...state.chatMessages, assistantMsg],
-        chatConsultadoLitros: litrosLeche,
+        chatConsultadoLitros: nuevoLitrosConsultado,
         isChatLoading: false,
         isGeneratingIA: false,
       }));
@@ -319,25 +337,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         ? String(litrosActuales)
         : litrosActuales.toFixed(1).replace('.', ',');
       const pregunta = `¿Qué necesito exactamente y es viable para mis ${litrosFmt} L de leche hacer ${alternativaNombre}?`;
-      await get().enviarConsultaChat(litrosActuales, pregunta);
+      await get().enviarConsultaChat(litrosActuales, pregunta, alternativaId);
       return;
     }
 
-    const textoAviso = `Ingresa primero los litros de leche arriba para que analice si puedes hacer ${alternativaNombre}.`;
-    set((state) => {
-      const ultimo = state.chatMessages[state.chatMessages.length - 1];
-      if (ultimo?.role === 'assistant' && ultimo?.texto === textoAviso) {
-        return state;
-      }
-      const avisoMsg: ChatMessage = {
-        id: crearIdMensaje(),
-        role: 'assistant',
-        texto: textoAviso,
-      };
-      return {
-        chatMessages: [...state.chatMessages, avisoMsg],
-      };
-    });
+    const preguntaGeneral = `¿Qué necesito exactamente, para qué escala es viable y qué precauciones tiene ${alternativaNombre}?`;
+    await get().enviarConsultaChat(undefined, preguntaGeneral, alternativaId);
   },
 
   showToast: (payload) => {

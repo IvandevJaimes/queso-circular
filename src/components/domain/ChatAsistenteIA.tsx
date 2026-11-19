@@ -18,6 +18,10 @@ import {
   RECETAS_QUESO_CIRCULAR,
   type RecetaLocal,
 } from '../../config/recetas.data';
+import {
+  scrollFieldIntoView,
+  useViewportKeyboard,
+} from '../../hooks/useViewportKeyboard';
 import type {
   AlternativaId,
   ChatMessage,
@@ -123,12 +127,19 @@ export function ChatAsistenteIA({
 }: ChatAsistenteIAProps) {
   const [inputText, setInputText] = useState('');
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const {
+    keyboardHeight,
+    isKeyboardOpen,
+    viewport,
+    viewportOverlayStyle,
+    getExpandedFrameStyle,
+  } = useViewportKeyboard();
 
   useEffect(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages, isLoading, isExpanded]);
+  }, [messages, isLoading, isExpanded, keyboardHeight]);
 
   useEffect(() => {
     if (!isExpanded) return;
@@ -175,15 +186,21 @@ export function ChatAsistenteIA({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const limpio = inputText.trim();
-    if (!limpio || litrosLeche <= 0 || isLoading) return;
+    if (!limpio || isLoading) return;
     setInputText('');
     onSendQuestion(limpio);
   };
+
+  const expandedStyle =
+    isExpanded && (isKeyboardOpen || (viewport && viewport.width < 768))
+      ? getExpandedFrameStyle(12)
+      : undefined;
 
   return (
     <>
       {isExpanded && (
         <div
+          style={viewportOverlayStyle}
           className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-200"
           onClick={onCloseExpand}
           aria-hidden="true"
@@ -194,6 +211,7 @@ export function ChatAsistenteIA({
         role={isExpanded ? 'dialog' : undefined}
         aria-modal={isExpanded ? true : undefined}
         aria-label={isExpanded ? 'Asistente Queso Circular IA expandido' : undefined}
+        style={expandedStyle}
         className={cn(
           'flex flex-col overflow-hidden transition-all duration-200',
           isExpanded
@@ -398,7 +416,7 @@ export function ChatAsistenteIA({
         </div>
 
         <div className="flex flex-col gap-2.5 border-t border-stone-200/80 bg-stone-50/70 p-3 dark:border-zinc-800/80 dark:bg-zinc-950/60">
-          {litrosLeche > 0 && (
+          {(litrosLeche > 0 || messages.length > 0) && (
             <div className="flex flex-wrap gap-1.5">
               {sugerencias.map((pregunta) => (
                 <button
@@ -419,17 +437,22 @@ export function ChatAsistenteIA({
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              disabled={litrosLeche <= 0 || isLoading}
+              onFocus={(e) => {
+                if (!isExpanded) {
+                  scrollFieldIntoView(e.currentTarget);
+                }
+              }}
+              disabled={isLoading}
               placeholder={
                 litrosLeche > 0
                   ? `Escribe tu duda sobre estos ${sueroTexto} L de suero...`
-                  : 'Ingresa arriba los litros de leche para consultar...'
+                  : 'Escribe tu consulta sobre aprovechamiento o viabilidad...'
               }
-              className="h-10 flex-1 rounded-xl border border-stone-300 bg-white px-3.5 text-sm text-zinc-900 placeholder:text-zinc-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+              className="h-10 flex-1 rounded-xl border border-stone-300 bg-white px-3.5 text-base text-zinc-900 placeholder:text-zinc-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 sm:text-sm"
             />
             <button
               type="submit"
-              disabled={!inputText.trim() || litrosLeche <= 0 || isLoading}
+              disabled={!inputText.trim() || isLoading}
               aria-label="Enviar consulta"
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-600 text-white transition-colors hover:bg-amber-500 disabled:pointer-events-none disabled:opacity-40 dark:bg-amber-500 dark:text-zinc-950 dark:hover:bg-amber-400 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
             >

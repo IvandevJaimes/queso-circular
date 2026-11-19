@@ -111,11 +111,220 @@ const RECETAS_ENUM: string[] = Array.from(RECETAS_VALIDAS);
 const CHAT_SYSTEM_INSTRUCTION =
   'Eres el asistente cercano y práctico de Queso Circular IA para pequeños productores queseros. ' +
   'Responde en español cotidiano, claro y directo, evitando fórmulas robóticas y tecnicismos académicos. ' +
-  'Usa los valores orientativos exactos recibidos en contextoLoteActual (12% queso en kg, 88% suero en litros, ricota ~6% del volumen de suero, nunca del total de leche) y preséntalos siempre como estimaciones orientativas. ' +
+  'Si contextoLoteActual incluye litrosLeche, usa sus valores orientativos exactos (12% queso en kg, 88% suero en litros, ricota ~6% del suero). Si volumenDefinido es false, evalúa la viabilidad técnica general de la alternativa o consulta (escala recomendada, equipo necesario, condiciones y precauciones) sin inventar que el usuario ya ingresó un lote; al final puedes mencionar brevemente que si ingresa sus litros arriba afinarás los cálculos. ' +
   'Regla de escala muy baja (suero < 20 L): aclara con naturalidad que es una partida chica o de prueba, que no justifica acopio de varios días, biogás ni logística compartida, y prioriza usos inmediatos del día (cocina casera puntual, dosis moderada en animales o riego muy diluido 1:2-1:3 en huerta) con sus precauciones sanitarias breves. ' +
   'Regla anti-repetición: prohibido abrir todos los mensajes con muletillas fijas como "Con X L de leche..." o "Tu mejor opción es...". Varía el inicio según tipoTurno y anguloSugerido (ve directo al grano, compara dos salidas, abre por una receta o destaca primero una precaución clave). Si el usuario cambió los litros respecto a litrosAnteriores, comenta brevemente qué cambia al subir o bajar de escala. Si responde una pregunta de seguimiento, contesta la duda sin recitar de nuevo toda la introducción general. ' +
   'Prohibido usar emojis. Sé conciso (máximo 55 palabras en "mensaje") y devuelve 3 preguntas sugeridas cortas y distintas entre sí. ' +
   'Selecciona 2 o 3 IDs exactos de recetasDisponibles en "recetasSugeridas" adaptados al volumen y consulta, procurando variar respecto a evitarRepetirRecetas cuando haya otras opciones válidas.';
+
+const GUIA_VIABILIDAD_SIN_LOTE: Record<
+  AlternativaId,
+  {
+    titulo: string;
+    mensaje: string;
+    escala: string;
+    pasos: [string, string, string];
+    consejo: string;
+    recetas: string[];
+  }
+> = {
+  ricota: {
+    titulo: 'Viabilidad de Elaboración de Ricota',
+    mensaje:
+      'Es muy viable desde unos 30 L de suero dulce fresco (rinde ~6% del suero, unos 1,8 kg cada 30 L). Si aún no definiste litros, verifica tener olla térmica, acidificante y frío bajo 4 °C.',
+    escala: 'Recomendada desde 30 L de suero (~6% de rinde)',
+    pasos: [
+      'Asegura suero dulce fresco procesado antes de 4 horas.',
+      'Ten termómetro, olla limpia y vinagre o ácido cítrico.',
+      'Prevé frío bajo 4 °C y destino para el permeado tibio.',
+    ],
+    consejo:
+      'Si tu lote diario es menor a 20 L de suero, suele rendir mejor panificados.',
+    recetas: ['ricota-casera-tradicional', 'tarta-frola-ricota', 'noquis-de-ricota-suaves'],
+  },
+  bebida_lactea: {
+    titulo: 'Viabilidad de Bebida Láctea Fermentada',
+    mensaje:
+      'Conviene a partir de ~20 L de suero dulce sin sal agregada. Requiere pasteurizar a 72–75 °C, pulpa o cultivo y cadena de frío continua para durar 5 a 7 días.',
+    escala: 'Recomendada desde 20 L de suero dulce',
+    pasos: [
+      'Confirma que el suero sea dulce y sin salmuera.',
+      'Pasteuriza a 72–75 °C antes de sumar fruta o fermento.',
+      'Envasa en botellas sanitizadas y refrigera entre 2 y 4 °C.',
+    ],
+    consejo:
+      'Nunca mezcles suero salado ni omitas la pasteurización previa.',
+    recetas: ['dulce-de-suero-artesanal', 'pan-casero-lactosuero', 'flan-cremoso-ricota'],
+  },
+  dulce_suero: {
+    titulo: 'Viabilidad de Dulce de Suero',
+    mensaje:
+      'Funciona bien en tandas de 20 a 100 L de suero dulce sin sal. Exige tiempo de fuego lento y paila gruesa para evaporar agua con azúcar (12–15%) hasta lograr untable.',
+    escala: 'Ideal entre 20 y 100 L de suero dulce',
+    pasos: [
+      'Parte de suero dulce fresco neutralizando leve acidez.',
+      'Añade 12–15% de azúcar y cocina en paila gruesa sin quemar.',
+      'Envasa en caliente en frascos limpios y esterilizados.',
+    ],
+    consejo:
+      'Ten en cuenta el consumo de gas o leña frente al precio de venta local.',
+    recetas: ['dulce-de-suero-artesanal', 'budin-citrico-ricota', 'flan-cremoso-ricota'],
+  },
+  panificados: {
+    titulo: 'Viabilidad como Sustituto en Panadería',
+    mensaje:
+      'Es la opción más flexible: viable desde menos de 5 L hasta lotes medianos, sin inversión extra. Sustituye el agua en panes, pizzas y focaccias mejorando miga y corteza.',
+    escala: 'Viable desde 1 L de suero (toda escala)',
+    pasos: [
+      'Usa suero fresco del día o refrigerado limpio en vez de agua.',
+      'Ajusta la sal de la receta si el suero proviene de quesos salados.',
+      'Vigila tiempos de leudado porque fermenta más rápido.',
+    ],
+    consejo:
+      'Si ingresas tus litros en la calculadora te indico cuántas tandas salen.',
+    recetas: ['pan-casero-lactosuero', 'focaccia-suero-romero', 'masa-pizza-suero'],
+  },
+  requeson_untable: {
+    titulo: 'Viabilidad de Requesón Cremoso Untable',
+    mensaje:
+      'Viable desde ~25 L de suero (o partiendo de ricota recién escurrida). Agrega valor comercial con bajo equipamiento extra usando procesador y frascos sanitizados.',
+    escala: 'Recomendada desde 25 L de suero o 1,5 kg de ricota',
+    pasos: [
+      'Obtén ricota tibia bien escurrida sin dejar que se seque de más.',
+      'Emulsiona con un toque de crema o suero fresco y hierbas.',
+      'Envasa hermético y conserva siempre bajo 4 °C.',
+    ],
+    consejo:
+      'Consume dentro de 5 a 7 días manteniendo estricta higiene en frascos.',
+    recetas: ['requeson-untable-hierbas', 'ricota-casera-tradicional', 'salsa-cremosa-ricota-pasta'],
+  },
+  vinagre_suero: {
+    titulo: 'Viabilidad de Vinagre Artesanal de Suero',
+    mensaje:
+      'Apto para partidas de 15 a 80 L si tienes paciencia de fermentación (2 a 4 semanas). Requiere suero filtrado, azúcar/levadura y madre de vinagre en ambiente cálido.',
+    escala: 'Escala chica/media (15–80 L), ciclo lento',
+    pasos: [
+      'Filtra y clarifica el suero dulce antes de iniciar fermentación.',
+      'Realiza fermentación alcohólica previa y luego inocula madre acética.',
+      'Controla acidez y filtra para embotellar producto estable.',
+    ],
+    consejo:
+      'No es una salida inmediata para vaciar tanques en el día.',
+    recetas: ['pan-casero-lactosuero', 'sopa-crema-calabaza-suero', 'focaccia-suero-romero'],
+  },
+  agricola: {
+    titulo: 'Viabilidad de Riego Agrícola Diluido',
+    mensaje:
+      'Viable a cualquier escala si cuentas con pastura o huerta propia. Nunca se aplica puro: exige diluir 1 parte de suero en 2 a 3 de agua y evitar quesos muy salados.',
+    escala: 'Apta para cualquier volumen con dilución 1:2–1:3',
+    pasos: [
+      'Confirma que el suero no tenga exceso de sal ni químicos.',
+      'Diluye mínimo 1:2 (o 1:3 en huerta sensible) con agua limpia.',
+      'Riega lejos de pozos, arroyos y evita suelos encharcados.',
+    ],
+    consejo:
+      'Si luego cargas tus litros arriba te calculo el agua exacta de dilución.',
+    recetas: ['pan-casero-lactosuero', 'sopa-crema-calabaza-suero'],
+  },
+  compostaje: {
+    titulo: 'Viabilidad como Acelerador de Compost',
+    mensaje:
+      'Muy viable en pequeña y mediana escala siempre que tengas suficiente material seco (hojas, paja, aserrín). Aporta humedad y nitrógeno sin riesgo si no se encharca.',
+    escala: 'Escala chica/media (hasta 100 L/semana)',
+    pasos: [
+      'Alterna capas abundantes de material seco rico en carbono.',
+      'Humedece con suero sin saturar ni generar escurrimientos.',
+      'Voltea la pila periódicamente para asegurar aireación y sin olor.',
+    ],
+    consejo:
+      'El exceso líquido pudre la pila; compensa siempre con fibra seca.',
+    recetas: ['pan-casero-lactosuero', 'masa-pizza-suero'],
+  },
+  biofertilizante_foliar: {
+    titulo: 'Viabilidad de Biofertilizante Foliar Fermentado',
+    mensaje:
+      'Viable entre 10 y 100 L para uso en quinta o pasturas. Necesitas biodigestor o tanque plástico cerrado con trampa de aire por 15 a 30 días y posterior dilución al 5–10%.',
+    escala: '10–100 L en fermentación controlada',
+    pasos: [
+      'Mezcla suero dulce con agua no clorada y melaza en tanque cerrado.',
+      'Coloca salida de gases con manguera en botella de agua (anaerobio).',
+      'Diluye al 5–10% antes de pulverizar en horas frescas.',
+    ],
+    consejo:
+      'Prueba primero en pocas plantas para verificar tolerancia del cultivo.',
+    recetas: ['pan-casero-lactosuero', 'sopa-crema-calabaza-suero'],
+  },
+  animal: {
+    titulo: 'Viabilidad en Suplementación Animal',
+    mensaje:
+      'Viable desde pocos litros hasta volúmenes altos si tienes cerdos, bovinos o aves. Requiere entrega fresca en el día, adaptación gradual y lavado diario de bebederos.',
+    escala: 'Todas las escalas con animales en predio',
+    pasos: [
+      'Entrega suero fresco del día acompañado de pasto o grano seco.',
+      'Aumenta la dosis gradualmente durante la primera semana.',
+      'Lava los bebederos a diario y deja agua limpia siempre aparte.',
+    ],
+    consejo:
+      'Nunca des suero viejo o muy agrio porque provoca diarreas.',
+    recetas: ['pan-casero-lactosuero', 'sopa-crema-calabaza-suero'],
+  },
+  ensilaje: {
+    titulo: 'Viabilidad como Inoculante de Ensilaje',
+    mensaje:
+      'Conviene en tambos o campos con volumen medio/alto (> 80 L) durante confección de silos de pasto o maíz. Mejora la fermentación láctica aportando lactosa y bacterias benéficas.',
+    escala: 'Escala media/alta (> 80 L) en época de silo',
+    pasos: [
+      'Rocía uniformemente el forraje picado al compactar el silo.',
+      'Controla que no drene líquido por exceso de humedad.',
+      'Sella hermético de inmediato para asegurar fermentación anaerobia.',
+    ],
+    consejo:
+      'Asegura que el forraje tenga buena materia seca antes de aplicar.',
+    recetas: ['ricota-casera-tradicional', 'pan-casero-lactosuero'],
+  },
+  intercambio: {
+    titulo: 'Viabilidad de Intercambio entre Productores',
+    mensaje:
+      'Solo justifica logística a partir de unos 120–150 L diarios o acumulables en frío en el día. En lotes muy chicos el costo de flete o traslado supera el valor del suero.',
+    escala: 'Escala media/alta (> 150 L/día)',
+    pasos: [
+      'Verifica un volumen diario constante que justifique el retiro.',
+      'Acopia en tanque cerrado higienizable bajo techo máximo 24 h.',
+      'Acuerda horario fijo con granjas porcinas o tambos cercanos.',
+    ],
+    consejo:
+      'Ingresa tus litros en la calculadora para confirmar si superas el umbral.',
+    recetas: ['ricota-casera-tradicional', 'dulce-de-suero-artesanal'],
+  },
+  biogas: {
+    titulo: 'Viabilidad de Biodigestión para Biogás',
+    mensaje:
+      'Solo es viable en escalas grandes y continuas (> 300–500 L diarios) junto a estiércol bovino o porcino, por la inversión en biodigestor y necesidad de carga estable.',
+    escala: 'Escala alta (> 300 L diarios continuos)',
+    pasos: [
+      'Confirma flujo diario constante y disponibilidad de estiércol para co-digestión.',
+      'Controla el pH para que la lactosa no acidifique el biodigestor.',
+      'Dimensiona trampa de seguridad y aprovechamiento térmico del gas.',
+    ],
+    consejo:
+      'Para partidas chicas o esporádicas no es viable; elige panificados o uso directo.',
+    recetas: ['pan-casero-lactosuero', 'ricota-casera-tradicional'],
+  },
+  secado_concentrado: {
+    titulo: 'Viabilidad de Secado / Concentrado Proteico',
+    mensaje:
+      'Requiere escala industrial (miles de litros diarios) y equipos de ultrafiltración o torre spray. Para pequeños queseros no es viable individualmente salvo en cooperativa.',
+    escala: 'Escala industrial o cooperativa (> 2.000 L/día)',
+    pasos: [
+      'Evalúa asociarte con otros tambos para reunir volumen industrial.',
+      'Garantiza cadena de frío a 4 °C antes de trasladar a planta.',
+      'Como alternativa local individual, prioriza ricota o dulce concentrado.',
+    ],
+    consejo:
+      'En tambos artesanales la ricota o el dulce sustituyen esa inversión con retorno inmediato.',
+    recetas: ['ricota-casera-tradicional', 'dulce-de-suero-artesanal'],
+  },
+};
 
 const ALTERNATIVAS_VALIDAS: ReadonlySet<AlternativaId> = new Set([
   'ricota',
@@ -505,21 +714,28 @@ export class IaService {
   }
 
   async responderChat(dto: ChatProduccionDto): Promise<ChatIAResponse> {
-    const quesoEstimado = +(dto.litrosLeche * 0.12).toFixed(2);
-    const sueroEstimado = +(dto.litrosLeche * 0.88).toFixed(2);
-    const ricotaEstimada = +(sueroEstimado * 0.06).toFixed(1);
+    const tieneLitros =
+      typeof dto.litrosLeche === 'number' && dto.litrosLeche > 0;
+    const litrosLeche = tieneLitros ? dto.litrosLeche! : 0;
+    const quesoEstimado = tieneLitros ? +(litrosLeche * 0.12).toFixed(2) : 0;
+    const sueroEstimado = tieneLitros ? +(litrosLeche * 0.88).toFixed(2) : 0;
+    const ricotaEstimada = tieneLitros ? +(sueroEstimado * 0.06).toFixed(1) : 0;
     const escala = clasificarEscalaSuero(sueroEstimado);
+    const alternativaObjetivo =
+      dto.alternativaObjetivo &&
+      ALTERNATIVAS_VALIDAS.has(dto.alternativaObjetivo as AlternativaId)
+        ? (dto.alternativaObjetivo as AlternativaId)
+        : undefined;
     const pregunta = dto.preguntaUsuario?.trim() || '';
     const historialReciente = Array.isArray(dto.historial)
       ? dto.historial.slice(-6)
       : [];
-    const variacionLitros = calcularVariacionLitros(
-      dto.litrosLeche,
-      dto.litrosAnteriores,
-    );
+    const variacionLitros = tieneLitros
+      ? calcularVariacionLitros(litrosLeche, dto.litrosAnteriores)
+      : 'primero';
     const tipoInteraccion: 'inicial' | 'cambio_litros' | 'pregunta' =
       dto.tipoInteraccion ??
-      (pregunta
+      (pregunta || !tieneLitros
         ? 'pregunta'
         : variacionLitros === 'subio' || variacionLitros === 'bajo'
           ? 'cambio_litros'
@@ -537,7 +753,9 @@ export class IaService {
     const angulo = elegirVariante(ANGULOS_ROTATIVOS, semillaVariacion);
 
     const contextoChat = {
+      tieneLitros,
       escala,
+      alternativaObjetivo,
       litrosAnteriores: dto.litrosAnteriores,
       variacionLitros,
       tipoInteraccion,
@@ -550,7 +768,7 @@ export class IaService {
     const apiKey = process.env.GEMINI_API_KEY?.trim();
     if (!apiKey || apiKey === 'tu_api_key_de_google_ai_studio') {
       return this.generarChatFallbackLocal(
-        dto.litrosLeche,
+        litrosLeche,
         sueroEstimado,
         ricotaEstimada,
         pregunta,
@@ -566,9 +784,10 @@ export class IaService {
       parts: [{ text: item.texto }],
     }));
 
-    const consultaPorDefecto =
-      tipoInteraccion === 'cambio_litros' && dto.litrosAnteriores
-        ? `Actualicé la partida de ${formatearEnteroOUnDecimal(dto.litrosAnteriores)} L a ${formatearEnteroOUnDecimal(dto.litrosLeche)} L de leche. Comenta brevemente qué cambia según la nueva escala, sugiere una estrategia práctica con un enfoque fresco y 2-3 recetas del catálogo.`
+    const consultaPorDefecto = !tieneLitros
+      ? 'Evalúa de forma práctica qué se necesita y para qué escala es viable esta alternativa antes de definir los litros.'
+      : tipoInteraccion === 'cambio_litros' && dto.litrosAnteriores
+        ? `Actualicé la partida de ${formatearEnteroOUnDecimal(dto.litrosAnteriores)} L a ${formatearEnteroOUnDecimal(litrosLeche)} L de leche. Comenta brevemente qué cambia según la nueva escala, sugiere una estrategia práctica con un enfoque fresco y 2-3 recetas del catálogo.`
         : 'Evalúa esta partida de forma natural y práctica según la escala del suero, con enfoque útil para hoy y 2-3 recetas del catálogo.';
 
     contents.push({
@@ -576,20 +795,30 @@ export class IaService {
       parts: [
         {
           text: JSON.stringify({
-            contextoLoteActual: {
-              litrosLeche: dto.litrosLeche,
-              quesoEstimadoKg: quesoEstimado,
-              sueroEstimadoLitros: sueroEstimado,
-              ricotaPotencialKg: ricotaEstimada,
-              escalaLote: escala,
-              caracterCifras: 'Todas las cantidades son estimaciones orientativas.',
-              ...(escala === 'muy_bajo'
-                ? {
-                    criterioEscalaMinima:
-                      'Volumen muy bajo (<20 L de suero). Aclara que es insuficiente para procesos de mayor escala, acopio prolongado o logística compartida. Prioriza aprovechamiento inmediato: cocina casera puntual, ración animal directa en dosis moderada o riego muy diluido (1:2-1:3) con cuidado de salinidad.',
-                  }
-                : {}),
-            },
+            contextoLoteActual: tieneLitros
+              ? {
+                  volumenDefinido: true,
+                  litrosLeche,
+                  quesoEstimadoKg: quesoEstimado,
+                  sueroEstimadoLitros: sueroEstimado,
+                  ricotaPotencialKg: ricotaEstimada,
+                  escalaLote: escala,
+                  caracterCifras:
+                    'Todas las cantidades son estimaciones orientativas.',
+                  ...(escala === 'muy_bajo'
+                    ? {
+                        criterioEscalaMinima:
+                          'Volumen muy bajo (<20 L de suero). Aclara que es insuficiente para procesos de mayor escala, acopio prolongado o logística compartida. Prioriza aprovechamiento inmediato: cocina casera puntual, ración animal directa en dosis moderada o riego muy diluido (1:2-1:3) con cuidado de salinidad.',
+                      }
+                    : {}),
+                }
+              : {
+                  volumenDefinido: false,
+                  ...(alternativaObjetivo
+                    ? { alternativaConsultada: alternativaObjetivo }
+                    : {}),
+                  nota: 'El productor aún no ingresó una cantidad de leche en la calculadora. Evalúa viabilidad técnica general, escala mínima recomendada, requisitos y precauciones sin inventar que ya cargó litros.',
+                },
             memoriaConversacion: {
               tipoTurno: tipoInteraccion,
               litrosAnteriores: dto.litrosAnteriores ?? null,
@@ -650,7 +879,7 @@ export class IaService {
         'Ningún modelo Gemini disponible respondió; usando motor-local.',
       );
       return this.generarChatFallbackLocal(
-        dto.litrosLeche,
+        litrosLeche,
         sueroEstimado,
         ricotaEstimada,
         pregunta,
@@ -663,7 +892,7 @@ export class IaService {
       return this.normalizarChatGemini(
         parsed,
         resultado.modelo,
-        dto.litrosLeche,
+        litrosLeche,
         sueroEstimado,
         ricotaEstimada,
         pregunta,
@@ -671,7 +900,7 @@ export class IaService {
       );
     } catch {
       return this.generarChatFallbackLocal(
-        dto.litrosLeche,
+        litrosLeche,
         sueroEstimado,
         ricotaEstimada,
         pregunta,
@@ -688,7 +917,9 @@ export class IaService {
     ricotaEstimada: number,
     pregunta: string,
     contextoChat: {
+      tieneLitros: boolean;
       escala: EscalaLote;
+      alternativaObjetivo?: AlternativaId;
       litrosAnteriores?: number;
       variacionLitros: VariacionLitros;
       tipoInteraccion: 'inicial' | 'cambio_litros' | 'pregunta';
@@ -718,9 +949,10 @@ export class IaService {
       parsed.alternativaSugerida &&
       ALTERNATIVAS_VALIDAS.has(parsed.alternativaSugerida)
         ? parsed.alternativaSugerida
-        : undefined;
+        : contextoChat.alternativaObjetivo;
 
     if (
+      contextoChat.tieneLitros &&
       contextoChat.escala === 'muy_bajo' &&
       alternativaSugerida &&
       alternativasNoAptaMuyBajo.has(alternativaSugerida)
@@ -754,14 +986,14 @@ export class IaService {
       recetasValidas.length >= 2
         ? recetasValidas
         : seleccionarRecetasPorDefecto(
-            sueroEstimado,
+            contextoChat.tieneLitros ? sueroEstimado : 45,
             pregunta,
             contextoChat.recetasPrevias,
             contextoChat.semillaVariacion,
           );
 
     const sugerenciasRespaldo =
-      contextoChat.escala === 'muy_bajo'
+      contextoChat.tieneLitros && contextoChat.escala === 'muy_bajo'
         ? PREGUNTAS_MUY_BAJO.slice(0, 3)
         : PREGUNTAS_BASE.slice(0, 3);
 
@@ -792,7 +1024,9 @@ export class IaService {
     ricotaEstimada: number,
     pregunta: string,
     contextoChat: {
+      tieneLitros: boolean;
       escala: EscalaLote;
+      alternativaObjetivo?: AlternativaId;
       litrosAnteriores?: number;
       variacionLitros: VariacionLitros;
       tipoInteraccion: 'inicial' | 'cambio_litros' | 'pregunta';
@@ -802,6 +1036,41 @@ export class IaService {
       semillaVariacion: number;
     },
   ): ChatIAResponse {
+    if (!contextoChat.tieneLitros) {
+      const altId = contextoChat.alternativaObjetivo ?? 'panificados';
+      const guia = GUIA_VIABILIDAD_SIN_LOTE[altId];
+      if (contextoChat.alternativaObjetivo || !pregunta) {
+        return {
+          origen: 'motor-local',
+          mensaje: guia.mensaje,
+          alternativaSugerida: altId,
+          tituloRecomendacion: guia.titulo,
+          rendimientoSimple: guia.escala,
+          pasosSimples: guia.pasos,
+          consejoClave: guia.consejo,
+          recetasSugeridas: guia.recetas,
+          sugerenciasSeguimiento: [
+            '¿Qué equipamiento mínimo necesito para empezar?',
+            'Si tengo menos de 20 L de suero, ¿sigue conviniendo?',
+            '¿Cómo conservo el suero fresco mientras lo proceso?',
+          ],
+        };
+      }
+
+      const referenciaSuero = 40;
+      const referenciaRicota = 2.4;
+      return this.generarChatFallbackLocal(
+        45,
+        referenciaSuero,
+        referenciaRicota,
+        pregunta,
+        {
+          ...contextoChat,
+          tieneLitros: true,
+          escala: 'medio',
+        },
+      );
+    }
     const litrosTxt = formatearEnteroOUnDecimal(litrosLeche);
     const sueroTxt = formatearEnteroOUnDecimal(sueroEstimado);
     const ricotaTxt = formatearDecimal(ricotaEstimada);

@@ -86,9 +86,10 @@ export function HomePage() {
         onToggleExpand={toggleChatExpanded}
         onCloseExpand={() => setChatExpanded(false)}
         onSendQuestion={(pregunta) => {
-          if (litrosActuales > 0) {
-            void enviarConsultaChat(litrosActuales, pregunta);
-          }
+          void enviarConsultaChat(
+            litrosActuales > 0 ? litrosActuales : undefined,
+            pregunta,
+          );
         }}
         onClearChat={limpiarChat}
         onOpenAlternativa={handleOpenAlternativa}

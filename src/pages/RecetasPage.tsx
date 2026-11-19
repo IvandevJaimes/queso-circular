@@ -70,7 +70,7 @@ export function RecetasPage() {
             placeholder="Buscar receta o ingrediente..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            className="h-10 pl-10 text-sm"
+            className="h-10 pl-10 text-base sm:text-sm"
           />
         </div>
 

@@ -102,7 +102,7 @@ export function AlternativasPage() {
             placeholder="Buscar (ricota, pan, biogás, compost)..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            className="h-10 pl-10 text-sm"
+            className="h-10 pl-10 text-base sm:text-sm"
           />
         </div>
 

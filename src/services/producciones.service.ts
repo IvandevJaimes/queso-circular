@@ -43,12 +43,13 @@ export const produccionesService = {
   },
 
   enviarMensajeChat(
-    litrosLeche: number,
+    litrosLeche?: number,
     preguntaUsuario?: string,
     historial?: HistorialChatItem[],
     contextoExtra?: {
       litrosAnteriores?: number;
       tipoInteraccion?: 'inicial' | 'cambio_litros' | 'pregunta';
+      alternativaObjetivo?: string;
       recetasPrevias?: string[];
       alternativasPrevias?: string[];
     },
@@ -56,7 +57,9 @@ export const produccionesService = {
     return fetchJson<ChatIAResponse>(`${BASE_ENDPOINT}/chat`, {
       method: 'POST',
       body: JSON.stringify({
-        litrosLeche,
+        ...(typeof litrosLeche === 'number' && litrosLeche > 0
+          ? { litrosLeche }
+          : {}),
         ...(preguntaUsuario ? { preguntaUsuario } : {}),
         ...(historial && historial.length > 0 ? { historial } : {}),
         ...(contextoExtra?.litrosAnteriores
@@ -64,6 +67,9 @@ export const produccionesService = {
           : {}),
         ...(contextoExtra?.tipoInteraccion
           ? { tipoInteraccion: contextoExtra.tipoInteraccion }
+          : {}),
+        ...(contextoExtra?.alternativaObjetivo
+          ? { alternativaObjetivo: contextoExtra.alternativaObjetivo }
           : {}),
         ...(contextoExtra?.recetasPrevias &&
         contextoExtra.recetasPrevias.length > 0

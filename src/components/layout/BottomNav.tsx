@@ -1,8 +1,15 @@
 import { NavLink } from 'react-router-dom';
+import { useViewportKeyboard } from '../../hooks/useViewportKeyboard';
 import { cn } from '../../utils/cn';
 import { NAV_ITEMS } from './Navbar';
 
 export function BottomNav() {
+  const { isKeyboardOpen } = useViewportKeyboard();
+
+  if (isKeyboardOpen) {
+    return null;
+  }
+
   return (
     <nav
       aria-label="Navegación móvil"

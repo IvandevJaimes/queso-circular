@@ -7,7 +7,12 @@ export function useTheme() {
   const toggleTheme = useAppStore((state) => state.toggleTheme);
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
+    const isDark = theme === 'dark';
+    document.documentElement.classList.toggle('dark', isDark);
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) {
+      themeMeta.setAttribute('content', isDark ? '#09090b' : '#fafaf9');
+    }
   }, [theme]);
 
   return {

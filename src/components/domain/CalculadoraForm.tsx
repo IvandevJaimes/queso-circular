@@ -1,9 +1,6 @@
 import { BookmarkCheck, Info, Save, Sparkles } from 'lucide-react';
-import {
-  MAX_LITROS_OPERATIVO,
-  PRESETS_LITROS,
-  UMBRAL_VOLUMEN_MUY_BAJO_SUERO,
-} from '../../config/constants';
+import { MAX_LITROS_OPERATIVO, PRESETS_LITROS, UMBRAL_VOLUMEN_MUY_BAJO_SUERO } from '../../config/constants';
+import { scrollFieldIntoView } from '../../hooks/useViewportKeyboard';
 import { parseLitrosInput } from '../../schemas/produccion.schema';
 import type { EstimacionResultado } from '../../types/produccion.types';
 import { cn } from '../../utils/cn';
@@ -86,6 +83,7 @@ export function CalculadoraForm({
               placeholder="Ej: 100"
               value={litrosInput}
               onChange={(e) => onChangeLitros(e.target.value)}
+              onFocus={(e) => scrollFieldIntoView(e.currentTarget)}
               aria-invalid={Boolean(errorMsg)}
               className={cn(
                 'h-11 w-full rounded-xl border bg-white px-3.5 pr-10 text-lg font-semibold tabular-nums text-zinc-900 placeholder:text-zinc-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-500',

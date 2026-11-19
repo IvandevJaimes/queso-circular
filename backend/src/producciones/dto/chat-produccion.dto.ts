@@ -20,9 +20,10 @@ export class HistorialMensajeDto {
 }
 
 export class ChatProduccionDto {
+  @IsOptional()
   @IsNumber()
   @IsPositive()
-  litrosLeche: number;
+  litrosLeche?: number;
 
   @IsOptional()
   @IsNumber()
@@ -32,6 +33,11 @@ export class ChatProduccionDto {
   @IsOptional()
   @IsIn(['inicial', 'cambio_litros', 'pregunta'])
   tipoInteraccion?: 'inicial' | 'cambio_litros' | 'pregunta';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  alternativaObjetivo?: string;
 
   @IsOptional()
   @IsString()

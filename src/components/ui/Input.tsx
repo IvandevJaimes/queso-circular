@@ -1,5 +1,6 @@
 import { forwardRef, useId, type InputHTMLAttributes } from 'react';
 import { AlertCircle } from 'lucide-react';
+import { scrollFieldIntoView } from '../../hooks/useViewportKeyboard';
 import { cn } from '../../utils/cn';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -9,7 +10,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { label, error, unitSuffix, className, id, ...props },
+  { label, error, unitSuffix, className, id, onFocus, ...props },
   ref,
 ) {
   const generatedId = useId();
@@ -40,6 +41,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
             unitSuffix && 'pr-12',
             className,
           )}
+          onFocus={(e) => {
+            scrollFieldIntoView(e.currentTarget);
+            onFocus?.(e);
+          }}
           {...props}
         />
         {unitSuffix && (

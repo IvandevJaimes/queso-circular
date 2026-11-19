@@ -1,5 +1,6 @@
 import { useEffect, useId, type ReactNode } from 'react';
 import { X } from 'lucide-react';
+import { useViewportKeyboard } from '../../hooks/useViewportKeyboard';
 import { cn } from '../../utils/cn';
 
 interface ModalProps {
@@ -28,6 +29,8 @@ export function Modal({
   size = 'lg',
 }: ModalProps) {
   const titleId = useId();
+  const { viewportOverlayStyle, getPanelMaxHeightStyle } =
+    useViewportKeyboard();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -49,7 +52,8 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6"
+      style={viewportOverlayStyle}
+      className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -60,8 +64,9 @@ export function Modal({
         aria-hidden="true"
       />
       <div
+        style={getPanelMaxHeightStyle(24)}
         className={cn(
-          'relative z-10 flex max-h-[90vh] w-full flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-900',
+          'relative z-10 flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl dark:border-zinc-800 dark:bg-zinc-900',
           sizeClasses[size],
         )}
       >

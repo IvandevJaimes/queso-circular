@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { BookOpen, Calculator, Clock, Recycle } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { BrandLogo } from '../ui/BrandLogo';
+import { InstallPWAButton } from '../ui/InstallPWAButton';
 import { ThemeToggle } from '../ui/ThemeToggle';
 
 export const NAV_ITEMS = [
@@ -47,6 +48,7 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <InstallPWAButton />
           <ThemeToggle />
         </div>
       </div>
