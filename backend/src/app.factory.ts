@@ -1,4 +1,4 @@
-import { config as loadEnv } from 'dotenv';
+import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -6,14 +6,32 @@ import type { NestApplicationOptions } from '@nestjs/common';
 import type { AbstractHttpAdapter } from '@nestjs/core';
 import { AppModule } from './app.module';
 
-export function cargarVariablesEntorno(): void {
+export async function cargarVariablesEntorno(): Promise<void> {
+  if (process.env.VERCEL) return;
+
   try {
-    if (typeof __dirname !== 'undefined') {
-      loadEnv({ path: resolve(__dirname, '../.env') });
+    const envPath =
+      typeof __dirname !== 'undefined'
+        ? resolve(__dirname, '../.env')
+        : resolve(process.cwd(), '.env');
+
+    if (!existsSync(envPath) && !existsSync(resolve(process.cwd(), '.env'))) {
+      return;
     }
-    loadEnv();
+
+    const dotenvModule = await import('dotenv');
+    const configFn =
+      dotenvModule.config ??
+      (dotenvModule as unknown as { default?: { config?: typeof dotenvModule.config } })
+        .default?.config;
+    if (typeof configFn === 'function') {
+      if (existsSync(envPath)) {
+        configFn({ path: envPath });
+      }
+      configFn();
+    }
   } catch {
-    // En entornos serverless las variables se leen directamente desde process.env
+    // Si dotenv no está instalado en producción serverless, usar process.env directo
   }
 }
 
@@ -21,7 +39,7 @@ export async function crearAppNest(
   adapter?: AbstractHttpAdapter,
   options?: NestApplicationOptions,
 ): Promise<INestApplication> {
-  cargarVariablesEntorno();
+  await cargarVariablesEntorno();
 
   const app = adapter
     ? await NestFactory.create(AppModule, adapter, options)
