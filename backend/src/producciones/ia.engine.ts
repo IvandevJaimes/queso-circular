@@ -68,6 +68,13 @@ interface GeminiGenerateResponse {
   }>;
 }
 
+interface FetchResponseLike {
+  ok: boolean;
+  status: number;
+  text(): Promise<string>;
+  json(): Promise<unknown>;
+}
+
 const GEMINI_BASE_URL =
   'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -589,7 +596,7 @@ async function llamarGeminiConRespaldo(
       const timeoutId = setTimeout(() => controller.abort(), 5500);
 
       try {
-        const response = await fetch(
+        const response = (await fetch(
           `${GEMINI_BASE_URL}/${modelo}:generateContent?key=${encodeURIComponent(apiKey)}`,
           {
             method: 'POST',
@@ -597,7 +604,7 @@ async function llamarGeminiConRespaldo(
             signal: controller.signal,
             body: JSON.stringify(payload),
           },
-        );
+        )) as unknown as FetchResponseLike;
 
         if (!response.ok) {
           const errBody = await response.text().catch(() => '');
