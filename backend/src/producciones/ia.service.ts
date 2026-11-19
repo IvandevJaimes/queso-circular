@@ -369,8 +369,14 @@ const PREGUNTAS_MUY_BAJO = [
   '¿Cuánto tiempo dura este suero sin enfriar?',
 ];
 
-function limpiarTexto(texto: string, maxLen: number): string {
-  const sinEmojis = texto
+function limpiarTexto(texto: unknown, maxLen: number): string {
+  const textoStr =
+    typeof texto === 'string'
+      ? texto
+      : typeof texto === 'number'
+        ? String(texto)
+        : '';
+  const sinEmojis = textoStr
     .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
     .replace(/\s+/g, ' ')
     .trim();
@@ -378,7 +384,7 @@ function limpiarTexto(texto: string, maxLen: number): string {
   return `${sinEmojis.slice(0, maxLen - 1).trimEnd()}.`;
 }
 
-function limitarPalabras(texto: string, maxPalabras: number): string {
+function limitarPalabras(texto: unknown, maxPalabras: number): string {
   const limpio = limpiarTexto(texto, 360);
   const palabras = limpio.split(' ').filter(Boolean);
   if (palabras.length <= maxPalabras) return limpio;
@@ -566,7 +572,7 @@ export class IaService {
 
     for (const modelo of modelos) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 5500);
 
       try {
         const response = await fetch(
@@ -605,100 +611,104 @@ export class IaService {
   async generarRecomendacion(
     dto: RecomendarProduccionDto,
   ): Promise<RecomendacionIAResponse> {
-    const quesoEstimado = +(dto.litrosLeche * 0.12).toFixed(2);
-    const sueroEstimado = +(dto.litrosLeche * 0.88).toFixed(2);
+    const litros = Number(dto?.litrosLeche);
+    const litrosSeguros = Number.isFinite(litros) && litros > 0 ? litros : 0;
+    const quesoEstimado = +(litrosSeguros * 0.12).toFixed(2);
+    const sueroEstimado = +(litrosSeguros * 0.88).toFixed(2);
     const escala = clasificarEscalaSuero(sueroEstimado);
-    const contexto = Array.isArray(dto.contexto)
-      ? dto.contexto.map((item) => item.trim()).filter(Boolean)
+    const contexto = Array.isArray(dto?.contexto)
+      ? dto.contexto
+          .map((item) => (typeof item === 'string' ? item.trim() : ''))
+          .filter(Boolean)
       : [];
 
-    const apiKey = process.env.GEMINI_API_KEY?.trim();
-    if (!apiKey || apiKey === 'tu_api_key_de_google_ai_studio') {
-      return this.generarFallbackLocal(sueroEstimado, contexto);
-    }
-
-    const contextoLegible =
-      contexto.length > 0
-        ? contexto.map((key) => CONTEXTO_DESCRIPCION[key] ?? key)
-        : ['Sin recursos especificados'];
-
-    const resultado = await this.llamarGeminiConRespaldo(apiKey, {
-      systemInstruction: {
-        parts: [{ text: SYSTEM_INSTRUCTION }],
-      },
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              text: JSON.stringify({
-                litrosLeche: dto.litrosLeche,
-                quesoEstimadoKg: quesoEstimado,
-                sueroEstimadoLitros: sueroEstimado,
-                escalaLote: escala,
-                notaEscala:
-                  escala === 'muy_bajo'
-                    ? 'Partida muy chica (<20 L de suero). Valores orientativos. Priorizar uso inmediato (panificados, animal o riego muy diluido). No recomendar intercambio, biogás ni secado.'
-                    : undefined,
-                recursosDisponibles: contextoLegible,
-                restriccionesSalida: {
-                  alternativaId: ALTERNATIVAS_ENUM.join(' | '),
-                  titulo: 'máximo 7 palabras',
-                  viabilidad: 'Óptima | Alta | Moderada',
-                  rendimientoSecundario:
-                    'cifra estimada corta en español (ej: ~5,3 kg de ricota + 83 L permeado)',
-                  justificacion: '1 oración directa, máximo 140 caracteres',
-                  pasosAccion:
-                    'exactamente 3 pasos cortos, máximo 10 palabras cada uno',
-                  precaucionClave:
-                    '1 línea corta de inocuidad o ambiente, máximo 90 caracteres',
-                },
-              }),
-            },
-          ],
-        },
-      ],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.45,
-        responseSchema: {
-          type: 'OBJECT',
-          properties: {
-            alternativaId: {
-              type: 'STRING',
-              enum: ALTERNATIVAS_ENUM,
-            },
-            titulo: { type: 'STRING' },
-            viabilidad: {
-              type: 'STRING',
-              enum: ['Óptima', 'Alta', 'Moderada'],
-            },
-            rendimientoSecundario: { type: 'STRING' },
-            justificacion: { type: 'STRING' },
-            pasosAccion: {
-              type: 'ARRAY',
-              items: { type: 'STRING' },
-            },
-            precaucionClave: { type: 'STRING' },
-          },
-          required: [
-            'alternativaId',
-            'titulo',
-            'viabilidad',
-            'rendimientoSecundario',
-            'justificacion',
-            'pasosAccion',
-            'precaucionClave',
-          ],
-        },
-      },
-    });
-
-    if (!resultado) {
-      return this.generarFallbackLocal(sueroEstimado, contexto);
-    }
-
     try {
+      const apiKey = process.env.GEMINI_API_KEY?.trim();
+      if (!apiKey || apiKey === 'tu_api_key_de_google_ai_studio') {
+        return this.generarFallbackLocal(sueroEstimado, contexto);
+      }
+
+      const contextoLegible =
+        contexto.length > 0
+          ? contexto.map((key) => CONTEXTO_DESCRIPCION[key] ?? key)
+          : ['Sin recursos especificados'];
+
+      const resultado = await this.llamarGeminiConRespaldo(apiKey, {
+        systemInstruction: {
+          parts: [{ text: SYSTEM_INSTRUCTION }],
+        },
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: JSON.stringify({
+                  litrosLeche: litrosSeguros,
+                  quesoEstimadoKg: quesoEstimado,
+                  sueroEstimadoLitros: sueroEstimado,
+                  escalaLote: escala,
+                  notaEscala:
+                    escala === 'muy_bajo'
+                      ? 'Partida muy chica (<20 L de suero). Valores orientativos. Priorizar uso inmediato (panificados, animal o riego muy diluido). No recomendar intercambio, biogás ni secado.'
+                      : undefined,
+                  recursosDisponibles: contextoLegible,
+                  restriccionesSalida: {
+                    alternativaId: ALTERNATIVAS_ENUM.join(' | '),
+                    titulo: 'máximo 7 palabras',
+                    viabilidad: 'Óptima | Alta | Moderada',
+                    rendimientoSecundario:
+                      'cifra estimada corta en español (ej: ~5,3 kg de ricota + 83 L permeado)',
+                    justificacion: '1 oración directa, máximo 140 caracteres',
+                    pasosAccion:
+                      'exactamente 3 pasos cortos, máximo 10 palabras cada uno',
+                    precaucionClave:
+                      '1 línea corta de inocuidad o ambiente, máximo 90 caracteres',
+                  },
+                }),
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.45,
+          responseSchema: {
+            type: 'OBJECT',
+            properties: {
+              alternativaId: {
+                type: 'STRING',
+                enum: ALTERNATIVAS_ENUM,
+              },
+              titulo: { type: 'STRING' },
+              viabilidad: {
+                type: 'STRING',
+                enum: ['Óptima', 'Alta', 'Moderada'],
+              },
+              rendimientoSecundario: { type: 'STRING' },
+              justificacion: { type: 'STRING' },
+              pasosAccion: {
+                type: 'ARRAY',
+                items: { type: 'STRING' },
+              },
+              precaucionClave: { type: 'STRING' },
+            },
+            required: [
+              'alternativaId',
+              'titulo',
+              'viabilidad',
+              'rendimientoSecundario',
+              'justificacion',
+              'pasosAccion',
+              'precaucionClave',
+            ],
+          },
+        },
+      });
+
+      if (!resultado) {
+        return this.generarFallbackLocal(sueroEstimado, contexto);
+      }
+
       const parsed = JSON.parse(
         resultado.rawText,
       ) as Partial<RecomendacionIAResponse>;
@@ -708,42 +718,57 @@ export class IaService {
         sueroEstimado,
         contexto,
       );
-    } catch {
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Error inesperado';
+      this.logger.error(`Error en generarRecomendacion: ${reason}`);
       return this.generarFallbackLocal(sueroEstimado, contexto);
     }
   }
 
   async responderChat(dto: ChatProduccionDto): Promise<ChatIAResponse> {
-    const tieneLitros =
-      typeof dto.litrosLeche === 'number' && dto.litrosLeche > 0;
-    const litrosLeche = tieneLitros ? dto.litrosLeche! : 0;
+    const litrosRaw = Number(dto?.litrosLeche);
+    const tieneLitros = Number.isFinite(litrosRaw) && litrosRaw > 0;
+    const litrosLeche = tieneLitros ? litrosRaw : 0;
     const quesoEstimado = tieneLitros ? +(litrosLeche * 0.12).toFixed(2) : 0;
     const sueroEstimado = tieneLitros ? +(litrosLeche * 0.88).toFixed(2) : 0;
     const ricotaEstimada = tieneLitros ? +(sueroEstimado * 0.06).toFixed(1) : 0;
     const escala = clasificarEscalaSuero(sueroEstimado);
     const alternativaObjetivo =
-      dto.alternativaObjetivo &&
+      dto?.alternativaObjetivo &&
       ALTERNATIVAS_VALIDAS.has(dto.alternativaObjetivo as AlternativaId)
         ? (dto.alternativaObjetivo as AlternativaId)
         : undefined;
-    const pregunta = dto.preguntaUsuario?.trim() || '';
-    const historialReciente = Array.isArray(dto.historial)
-      ? dto.historial.slice(-6)
+    const pregunta =
+      typeof dto?.preguntaUsuario === 'string' ? dto.preguntaUsuario.trim() : '';
+    const historialReciente = Array.isArray(dto?.historial)
+      ? dto.historial
+          .slice(-6)
+          .filter(
+            (item) =>
+              item &&
+              typeof item.texto === 'string' &&
+              (item.role === 'user' || item.role === 'assistant'),
+          )
       : [];
+    const litrosAnterioresNum = Number(dto?.litrosAnteriores);
+    const litrosAnteriores =
+      Number.isFinite(litrosAnterioresNum) && litrosAnterioresNum > 0
+        ? litrosAnterioresNum
+        : undefined;
     const variacionLitros = tieneLitros
-      ? calcularVariacionLitros(litrosLeche, dto.litrosAnteriores)
+      ? calcularVariacionLitros(litrosLeche, litrosAnteriores)
       : 'primero';
     const tipoInteraccion: 'inicial' | 'cambio_litros' | 'pregunta' =
-      dto.tipoInteraccion ??
+      dto?.tipoInteraccion ??
       (pregunta || !tieneLitros
         ? 'pregunta'
         : variacionLitros === 'subio' || variacionLitros === 'bajo'
           ? 'cambio_litros'
           : 'inicial');
-    const recetasPrevias = Array.isArray(dto.recetasPrevias)
+    const recetasPrevias = Array.isArray(dto?.recetasPrevias)
       ? dto.recetasPrevias.filter((id) => RECETAS_VALIDAS.has(id)).slice(-6)
       : [];
-    const alternativasPrevias = Array.isArray(dto.alternativasPrevias)
+    const alternativasPrevias = Array.isArray(dto?.alternativasPrevias)
       ? dto.alternativasPrevias.slice(-3)
       : [];
     const semillaVariacion =
@@ -756,7 +781,7 @@ export class IaService {
       tieneLitros,
       escala,
       alternativaObjetivo,
-      litrosAnteriores: dto.litrosAnteriores,
+      litrosAnteriores,
       variacionLitros,
       tipoInteraccion,
       angulo,
@@ -765,129 +790,129 @@ export class IaService {
       semillaVariacion,
     };
 
-    const apiKey = process.env.GEMINI_API_KEY?.trim();
-    if (!apiKey || apiKey === 'tu_api_key_de_google_ai_studio') {
-      return this.generarChatFallbackLocal(
-        litrosLeche,
-        sueroEstimado,
-        ricotaEstimada,
-        pregunta,
-        contextoChat,
-      );
-    }
+    try {
+      const apiKey = process.env.GEMINI_API_KEY?.trim();
+      if (!apiKey || apiKey === 'tu_api_key_de_google_ai_studio') {
+        return this.generarChatFallbackLocal(
+          litrosLeche,
+          sueroEstimado,
+          ricotaEstimada,
+          pregunta,
+          contextoChat,
+        );
+      }
 
-    const contents: Array<{
-      role: 'user' | 'model';
-      parts: Array<{ text: string }>;
-    }> = historialReciente.map((item) => ({
-      role: item.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: item.texto }],
-    }));
+      const contents: Array<{
+        role: 'user' | 'model';
+        parts: Array<{ text: string }>;
+      }> = historialReciente.map((item) => ({
+        role: item.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: item.texto }],
+      }));
 
-    const consultaPorDefecto = !tieneLitros
-      ? 'Evalúa de forma práctica qué se necesita y para qué escala es viable esta alternativa antes de definir los litros.'
-      : tipoInteraccion === 'cambio_litros' && dto.litrosAnteriores
-        ? `Actualicé la partida de ${formatearEnteroOUnDecimal(dto.litrosAnteriores)} L a ${formatearEnteroOUnDecimal(litrosLeche)} L de leche. Comenta brevemente qué cambia según la nueva escala, sugiere una estrategia práctica con un enfoque fresco y 2-3 recetas del catálogo.`
-        : 'Evalúa esta partida de forma natural y práctica según la escala del suero, con enfoque útil para hoy y 2-3 recetas del catálogo.';
+      const consultaPorDefecto = !tieneLitros
+        ? 'Evalúa de forma práctica qué se necesita y para qué escala es viable esta alternativa antes de definir los litros.'
+        : tipoInteraccion === 'cambio_litros' && litrosAnteriores
+          ? `Actualicé la partida de ${formatearEnteroOUnDecimal(litrosAnteriores)} L a ${formatearEnteroOUnDecimal(litrosLeche)} L de leche. Comenta brevemente qué cambia según la nueva escala, sugiere una estrategia práctica con un enfoque fresco y 2-3 recetas del catálogo.`
+          : 'Evalúa esta partida de forma natural y práctica según la escala del suero, con enfoque útil para hoy y 2-3 recetas del catálogo.';
 
-    contents.push({
-      role: 'user',
-      parts: [
-        {
-          text: JSON.stringify({
-            contextoLoteActual: tieneLitros
-              ? {
-                  volumenDefinido: true,
-                  litrosLeche,
-                  quesoEstimadoKg: quesoEstimado,
-                  sueroEstimadoLitros: sueroEstimado,
-                  ricotaPotencialKg: ricotaEstimada,
-                  escalaLote: escala,
-                  caracterCifras:
-                    'Todas las cantidades son estimaciones orientativas.',
-                  ...(escala === 'muy_bajo'
-                    ? {
-                        criterioEscalaMinima:
-                          'Volumen muy bajo (<20 L de suero). Aclara que es insuficiente para procesos de mayor escala, acopio prolongado o logística compartida. Prioriza aprovechamiento inmediato: cocina casera puntual, ración animal directa en dosis moderada o riego muy diluido (1:2-1:3) con cuidado de salinidad.',
-                      }
-                    : {}),
-                }
-              : {
-                  volumenDefinido: false,
-                  ...(alternativaObjetivo
-                    ? { alternativaConsultada: alternativaObjetivo }
-                    : {}),
-                  nota: 'El productor aún no ingresó una cantidad de leche en la calculadora. Evalúa viabilidad técnica general, escala mínima recomendada, requisitos y precauciones sin inventar que ya cargó litros.',
-                },
-            memoriaConversacion: {
-              tipoTurno: tipoInteraccion,
-              litrosAnteriores: dto.litrosAnteriores ?? null,
-              variacionRespectoAnterior: variacionLitros,
-              anguloSugerido: angulo,
-              alternativasYaComentadas: alternativasPrevias,
-              evitarRepetirRecetas: recetasPrevias,
-            },
-            recetasDisponibles: CATALOGO_RECETAS_IA,
-            consultaProductor: pregunta || consultaPorDefecto,
-          }),
+      contents.push({
+        role: 'user',
+        parts: [
+          {
+            text: JSON.stringify({
+              contextoLoteActual: tieneLitros
+                ? {
+                    volumenDefinido: true,
+                    litrosLeche,
+                    quesoEstimadoKg: quesoEstimado,
+                    sueroEstimadoLitros: sueroEstimado,
+                    ricotaPotencialKg: ricotaEstimada,
+                    escalaLote: escala,
+                    caracterCifras:
+                      'Todas las cantidades son estimaciones orientativas.',
+                    ...(escala === 'muy_bajo'
+                      ? {
+                          criterioEscalaMinima:
+                            'Volumen muy bajo (<20 L de suero). Aclara que es insuficiente para procesos de mayor escala, acopio prolongado o logística compartida. Prioriza aprovechamiento inmediato: cocina casera puntual, ración animal directa en dosis moderada o riego muy diluido (1:2-1:3) con cuidado de salinidad.',
+                        }
+                      : {}),
+                  }
+                : {
+                    volumenDefinido: false,
+                    ...(alternativaObjetivo
+                      ? { alternativaConsultada: alternativaObjetivo }
+                      : {}),
+                    nota: 'El productor aún no ingresó una cantidad de leche en la calculadora. Evalúa viabilidad técnica general, escala mínima recomendada, requisitos y precauciones sin inventar que ya cargó litros.',
+                  },
+              memoriaConversacion: {
+                tipoTurno: tipoInteraccion,
+                litrosAnteriores: litrosAnteriores ?? null,
+                variacionRespectoAnterior: variacionLitros,
+                anguloSugerido: angulo,
+                alternativasYaComentadas: alternativasPrevias,
+                evitarRepetirRecetas: recetasPrevias,
+              },
+              recetasDisponibles: CATALOGO_RECETAS_IA,
+              consultaProductor: pregunta || consultaPorDefecto,
+            }),
+          },
+        ],
+      });
+
+      const resultado = await this.llamarGeminiConRespaldo(apiKey, {
+        systemInstruction: {
+          parts: [{ text: CHAT_SYSTEM_INSTRUCTION }],
         },
-      ],
-    });
-
-    const resultado = await this.llamarGeminiConRespaldo(apiKey, {
-      systemInstruction: {
-        parts: [{ text: CHAT_SYSTEM_INSTRUCTION }],
-      },
-      contents,
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.72,
-        responseSchema: {
-          type: 'OBJECT',
-          properties: {
-            mensaje: { type: 'STRING' },
-            alternativaSugerida: {
-              type: 'STRING',
-              enum: ALTERNATIVAS_ENUM,
-            },
-            tituloRecomendacion: { type: 'STRING' },
-            rendimientoSimple: { type: 'STRING' },
-            pasosSimples: {
-              type: 'ARRAY',
-              items: { type: 'STRING' },
-            },
-            consejoClave: { type: 'STRING' },
-            recetasSugeridas: {
-              type: 'ARRAY',
-              items: {
+        contents,
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.72,
+          responseSchema: {
+            type: 'OBJECT',
+            properties: {
+              mensaje: { type: 'STRING' },
+              alternativaSugerida: {
                 type: 'STRING',
-                enum: RECETAS_ENUM,
+                enum: ALTERNATIVAS_ENUM,
+              },
+              tituloRecomendacion: { type: 'STRING' },
+              rendimientoSimple: { type: 'STRING' },
+              pasosSimples: {
+                type: 'ARRAY',
+                items: { type: 'STRING' },
+              },
+              consejoClave: { type: 'STRING' },
+              recetasSugeridas: {
+                type: 'ARRAY',
+                items: {
+                  type: 'STRING',
+                  enum: RECETAS_ENUM,
+                },
+              },
+              sugerenciasSeguimiento: {
+                type: 'ARRAY',
+                items: { type: 'STRING' },
               },
             },
-            sugerenciasSeguimiento: {
-              type: 'ARRAY',
-              items: { type: 'STRING' },
-            },
+            required: ['mensaje', 'recetasSugeridas', 'sugerenciasSeguimiento'],
           },
-          required: ['mensaje', 'recetasSugeridas', 'sugerenciasSeguimiento'],
         },
-      },
-    });
+      });
 
-    if (!resultado) {
-      this.logger.warn(
-        'Ningún modelo Gemini disponible respondió; usando motor-local.',
-      );
-      return this.generarChatFallbackLocal(
-        litrosLeche,
-        sueroEstimado,
-        ricotaEstimada,
-        pregunta,
-        contextoChat,
-      );
-    }
+      if (!resultado) {
+        this.logger.warn(
+          'Ningún modelo Gemini disponible respondió; usando motor-local.',
+        );
+        return this.generarChatFallbackLocal(
+          litrosLeche,
+          sueroEstimado,
+          ricotaEstimada,
+          pregunta,
+          contextoChat,
+        );
+      }
 
-    try {
       const parsed = JSON.parse(resultado.rawText) as Partial<ChatIAResponse>;
       return this.normalizarChatGemini(
         parsed,
@@ -898,7 +923,9 @@ export class IaService {
         pregunta,
         contextoChat,
       );
-    } catch {
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Error inesperado';
+      this.logger.error(`Error en responderChat: ${reason}`);
       return this.generarChatFallbackLocal(
         litrosLeche,
         sueroEstimado,

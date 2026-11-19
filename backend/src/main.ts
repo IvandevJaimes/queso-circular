@@ -4,8 +4,14 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 
-loadEnv({ path: resolve(__dirname, '../.env') });
-loadEnv();
+try {
+  if (typeof __dirname !== 'undefined') {
+    loadEnv({ path: resolve(__dirname, '../.env') });
+  }
+  loadEnv();
+} catch {
+  // En entornos serverless las variables se leen directamente desde process.env
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
