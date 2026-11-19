@@ -51,6 +51,14 @@ export async function fetchJson<T>(
       return undefined as T;
     }
 
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new HttpError(
+        `El endpoint ${url} no devolvió JSON (recibió ${contentType || 'respuesta vacía'}). El backend API no está enlazado en esta URL.`,
+        502,
+      );
+    }
+
     return (await response.json()) as T;
   } catch (error) {
     if (error instanceof HttpError) {
@@ -60,6 +68,12 @@ export async function fetchJson<T>(
       throw new HttpError(
         'La solicitud tardó demasiado en responder. Verifica la conexión.',
         408,
+      );
+    }
+    if (error instanceof SyntaxError) {
+      throw new HttpError(
+        `Respuesta inválida del servidor en ${url}. Verifica que el backend API esté respondiendo JSON.`,
+        502,
       );
     }
     throw new HttpError(
