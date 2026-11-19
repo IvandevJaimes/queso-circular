@@ -3,6 +3,7 @@ import {
   RENDIMIENTO_SUERO,
   UMBRAL_VOLUMEN_BAJO_SUERO,
   UMBRAL_VOLUMEN_MEDIO_SUERO,
+  UMBRAL_VOLUMEN_MUY_BAJO_SUERO,
 } from '../config/constants';
 import type {
   EstimacionResultado,
@@ -22,6 +23,18 @@ export function calcularProduccion(
 }
 
 export function generarRecomendacion(sueroEstimado: number): Recomendacion {
+  if (sueroEstimado < UMBRAL_VOLUMEN_MUY_BAJO_SUERO) {
+    return {
+      nivel: 'bajo',
+      escalaBadge: '< 20 L',
+      categoria: 'Uso inmediato',
+      alternativaId: 'panificados',
+      titulo: 'Cocina puntual, ración animal o riego diluido',
+      motivo:
+        'Volumen orientativo de escala mínima: no justifica acopio prolongado ni logística externa; conviene aprovecharlo fresco en el día.',
+    };
+  }
+
   if (sueroEstimado < UMBRAL_VOLUMEN_BAJO_SUERO) {
     return {
       nivel: 'bajo',

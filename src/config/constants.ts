@@ -9,8 +9,9 @@ export const PORCENTAJE_QUESO = 12;
 export const PORCENTAJE_SUERO = 88;
 
 export const MAX_LITROS_OPERATIVO = 50000;
-export const PRESETS_LITROS = [25, 50, 120, 250] as const;
+export const PRESETS_LITROS = [15, 50, 120, 250] as const;
 
+export const UMBRAL_VOLUMEN_MUY_BAJO_SUERO = 20;
 export const UMBRAL_VOLUMEN_BAJO_SUERO = 30;
 export const UMBRAL_VOLUMEN_MEDIO_SUERO = 150;
 

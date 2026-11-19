@@ -163,9 +163,41 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!pregunta && get().chatConsultadoLitros === litrosLeche) return;
 
     const requestToken = ++activeChatRequestToken;
-    const historialPrevio = get()
-      .chatMessages.slice(-6)
+    const mensajesPrevios = get().chatMessages;
+    const historialPrevio = mensajesPrevios
+      .slice(-6)
       .map((m) => ({ role: m.role, texto: m.texto }));
+
+    const litrosPrevios =
+      get().chatConsultadoLitros ??
+      [...mensajesPrevios]
+        .reverse()
+        .find((m) => typeof m.litrosContexto === 'number' && m.litrosContexto > 0)
+        ?.litrosContexto ??
+      undefined;
+
+    const recetasPrevias = Array.from(
+      new Set(
+        mensajesPrevios
+          .slice(-4)
+          .flatMap((m) => m.data?.recetasSugeridas ?? []),
+      ),
+    ).slice(-6);
+
+    const alternativasPrevias = Array.from(
+      new Set(
+        mensajesPrevios
+          .slice(-4)
+          .map((m) => m.data?.alternativaSugerida)
+          .filter((a): a is AlternativaId => Boolean(a)),
+      ),
+    ).slice(-3);
+
+    const tipoInteraccion: 'inicial' | 'cambio_litros' | 'pregunta' = pregunta
+      ? 'pregunta'
+      : litrosPrevios && litrosPrevios !== litrosLeche
+        ? 'cambio_litros'
+        : 'inicial';
 
     if (pregunta) {
       set((state) => {
@@ -205,6 +237,15 @@ export const useAppStore = create<AppState>((set, get) => ({
           litrosLeche,
           pregunta,
           historialPrevio,
+          {
+            litrosAnteriores:
+              litrosPrevios && litrosPrevios !== litrosLeche
+                ? litrosPrevios
+                : undefined,
+            tipoInteraccion,
+            recetasPrevias,
+            alternativasPrevias,
+          },
         ),
         minDelay,
       ]);

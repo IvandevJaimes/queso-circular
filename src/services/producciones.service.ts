@@ -46,6 +46,12 @@ export const produccionesService = {
     litrosLeche: number,
     preguntaUsuario?: string,
     historial?: HistorialChatItem[],
+    contextoExtra?: {
+      litrosAnteriores?: number;
+      tipoInteraccion?: 'inicial' | 'cambio_litros' | 'pregunta';
+      recetasPrevias?: string[];
+      alternativasPrevias?: string[];
+    },
   ): Promise<ChatIAResponse> {
     return fetchJson<ChatIAResponse>(`${BASE_ENDPOINT}/chat`, {
       method: 'POST',
@@ -53,6 +59,20 @@ export const produccionesService = {
         litrosLeche,
         ...(preguntaUsuario ? { preguntaUsuario } : {}),
         ...(historial && historial.length > 0 ? { historial } : {}),
+        ...(contextoExtra?.litrosAnteriores
+          ? { litrosAnteriores: contextoExtra.litrosAnteriores }
+          : {}),
+        ...(contextoExtra?.tipoInteraccion
+          ? { tipoInteraccion: contextoExtra.tipoInteraccion }
+          : {}),
+        ...(contextoExtra?.recetasPrevias &&
+        contextoExtra.recetasPrevias.length > 0
+          ? { recetasPrevias: contextoExtra.recetasPrevias }
+          : {}),
+        ...(contextoExtra?.alternativasPrevias &&
+        contextoExtra.alternativasPrevias.length > 0
+          ? { alternativasPrevias: contextoExtra.alternativasPrevias }
+          : {}),
       }),
     });
   },

@@ -1,5 +1,9 @@
-import { BookmarkCheck, Save, Sparkles } from 'lucide-react';
-import { MAX_LITROS_OPERATIVO, PRESETS_LITROS } from '../../config/constants';
+import { BookmarkCheck, Info, Save, Sparkles } from 'lucide-react';
+import {
+  MAX_LITROS_OPERATIVO,
+  PRESETS_LITROS,
+  UMBRAL_VOLUMEN_MUY_BAJO_SUERO,
+} from '../../config/constants';
 import { parseLitrosInput } from '../../schemas/produccion.schema';
 import type { EstimacionResultado } from '../../types/produccion.types';
 import { cn } from '../../utils/cn';
@@ -69,7 +73,7 @@ export function CalculadoraForm({
             Litros de leche a elaborar
           </label>
           <span className="text-[11px] text-zinc-400 dark:text-zinc-500">
-            Referencia 12% / 88%
+            Estimación orientativa 12% / 88%
           </span>
         </div>
 
@@ -187,6 +191,20 @@ export function CalculadoraForm({
           </p>
         </div>
       </div>
+
+      {isValidValue && suero > 0 && suero < UMBRAL_VOLUMEN_MUY_BAJO_SUERO && (
+        <div className="flex items-start gap-2 rounded-xl border border-sky-500/25 bg-sky-500/5 px-3 py-2 text-xs text-zinc-700 dark:bg-sky-500/10 dark:text-zinc-300">
+          <Info
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-600 dark:text-sky-400"
+            aria-hidden="true"
+          />
+          <span>
+            Partida chica (valores orientativos): volumen reducido para acopio o
+            escala mayor; prioriza uso fresco en cocina, ración animal o riego
+            muy diluido.
+          </span>
+        </div>
+      )}
     </Card>
   );
 }

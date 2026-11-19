@@ -25,6 +25,15 @@ export class ChatProduccionDto {
   litrosLeche: number;
 
   @IsOptional()
+  @IsNumber()
+  @IsPositive()
+  litrosAnteriores?: number;
+
+  @IsOptional()
+  @IsIn(['inicial', 'cambio_litros', 'pregunta'])
+  tipoInteraccion?: 'inicial' | 'cambio_litros' | 'pregunta';
+
+  @IsOptional()
   @IsString()
   @MaxLength(400)
   preguntaUsuario?: string;
@@ -34,4 +43,14 @@ export class ChatProduccionDto {
   @ValidateNested({ each: true })
   @Type(() => HistorialMensajeDto)
   historial?: HistorialMensajeDto[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  recetasPrevias?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  alternativasPrevias?: string[];
 }

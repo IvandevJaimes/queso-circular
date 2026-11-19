@@ -13,6 +13,7 @@ import {
   User,
   Utensils,
 } from 'lucide-react';
+import { UMBRAL_VOLUMEN_MUY_BAJO_SUERO } from '../../config/constants';
 import {
   RECETAS_QUESO_CIRCULAR,
   type RecetaLocal,
@@ -44,6 +45,13 @@ const PREGUNTAS_RAPIDAS_DEFAULT = [
   'No tengo fuego ni olla grande, ¿qué otra opción hay?',
   '¿Cómo se lo doy a los animales sin que les haga mal?',
   '¿Cómo lo uso para regar la huerta o pastura?',
+];
+
+const PREGUNTAS_RAPIDAS_MUY_BAJO = [
+  '¿Conviene hacer ricota con tan poco suero o mejor panificados?',
+  '¿Cómo diluyo estos pocos litros para huerta o macetas?',
+  '¿Cuánto le puedo dar hoy a aves o cerdos sin excederme?',
+  '¿Cuánto tiempo dura este suero sin enfriar?',
 ];
 
 function RecetaMiniCard({
@@ -142,11 +150,16 @@ export function ChatAsistenteIA({
     .reverse()
     .find((m) => m.role === 'assistant' && m.data);
 
+  const sugerenciasPorDefecto =
+    sueroEstimado > 0 && sueroEstimado < UMBRAL_VOLUMEN_MUY_BAJO_SUERO
+      ? PREGUNTAS_RAPIDAS_MUY_BAJO
+      : PREGUNTAS_RAPIDAS_DEFAULT;
+
   const sugerencias =
     ultimoMensajeIA?.data?.sugerenciasSeguimiento &&
     ultimoMensajeIA.data.sugerenciasSeguimiento.length > 0
       ? ultimoMensajeIA.data.sugerenciasSeguimiento
-      : PREGUNTAS_RAPIDAS_DEFAULT;
+      : sugerenciasPorDefecto;
 
   const origenActual = ultimoMensajeIA?.data?.origen;
   const etiquetaOrigen = !origenActual
@@ -253,7 +266,7 @@ export function ChatAsistenteIA({
                 <Bot className="h-4 w-4" aria-hidden="true" />
               </span>
               <div className="max-w-[88%] rounded-2xl rounded-tl-sm border border-stone-200/80 bg-stone-50 px-3.5 py-2.5 text-sm leading-relaxed text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950/70 dark:text-zinc-300">
-                Hola. Ingresa arriba los litros de leche que vas a elaborar y te diré la forma más simple y rentable de aprovechar el suero.
+                Hola. Ingresa arriba los litros de leche que vas a elaborar y te daré opciones prácticas y orientativas según la escala de suero que obtengas.
               </div>
             </div>
           )}
