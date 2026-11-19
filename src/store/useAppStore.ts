@@ -296,7 +296,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const errorMsg: ChatMessage = {
         id: crearIdMensaje(),
         role: 'assistant',
-        texto: `${mensajeError} Verifica que el servidor backend esté activo en el puerto 4000.`,
+        texto: `${mensajeError} Verifica que el servicio API esté disponible.`,
       };
 
       set((state) => ({

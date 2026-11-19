@@ -1,7 +1,6 @@
 import type { Alternativa } from '../types/produccion.types';
 
-export const API_URL =
-  import.meta.env.VITE_API_URL || 'http://localhost:4000';
+export const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const RENDIMIENTO_QUESO = 0.12;
 export const RENDIMIENTO_SUERO = 0.88;

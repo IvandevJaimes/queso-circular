@@ -6,7 +6,9 @@ import { ProduccionesModule } from './producciones/producciones.module';
   imports: [
     TypeOrmModule.forRoot({
       type: 'sqlite',
-      database: 'queso.db',
+      database:
+        process.env.SQLITE_PATH ||
+        (process.env.VERCEL ? '/tmp/queso.db' : 'queso.db'),
       autoLoadEntities: true,
       synchronize: true,
     }),

@@ -63,7 +63,7 @@ export async function fetchJson<T>(
       );
     }
     throw new HttpError(
-      'No se pudo conectar con el servidor. Verifica que el backend esté iniciado en el puerto 4000.',
+      'No se pudo conectar con el servidor de Queso Circular IA. Verifica que el backend esté disponible.',
       0,
     );
   } finally {
