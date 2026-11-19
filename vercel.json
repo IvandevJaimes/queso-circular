@@ -3,11 +3,22 @@
   "services": {
     "app": {
       "root": ".",
-      "framework": "vite"
+      "framework": "vite",
+      "installCommand": "pnpm install --frozen-lockfile",
+      "buildCommand": "pnpm build",
+      "outputDirectory": "dist",
+      "rewrites": [
+        {
+          "source": "/(.*)",
+          "destination": "/index.html"
+        }
+      ]
     },
     "backend": {
       "root": "backend",
-      "framework": "nestjs"
+      "framework": "nestjs",
+      "installCommand": "npm ci",
+      "buildCommand": "npm run build"
     }
   },
   "rewrites": [
